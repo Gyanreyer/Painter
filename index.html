@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painter</title>
+  
+    <link rel="apple-touch-icon" sizes="57x57" href="favicon/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="favicon/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="favicon/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="favicon/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="favicon/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="favicon/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="favicon/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="favicon/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192"  href="favicon/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
+    <link rel="manifest" href="favicon/manifest.json">
+    <meta name="msapplication-TileColor" content="#505aff">
+    <meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
+    <meta name="theme-color" content="#505aff">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  
+    <script src="scripts/include/three.min.js"></script>
+    <scipt src="scripts/include/canvas-toBlob.js"></scipt>
+    <script src="scripts/include/FileSaver.min.js"></script>
+    
+    <script src="scripts/paint.js"></script>
+    <script src="scripts/ui.js"></script>
+    <script src="scripts/saver.js"></script>
+    
+    
+    
+    <script id="vShader-buf" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        
+        void main(){
+            vUv = uv;
+            gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
+        }
+    </script>
+    
+    <script id="fShader-buf" type="x-shader/x-fragment">
+        varying vec2 vUv;
+        uniform sampler2D tCurrentFront;
+        uniform float uWidth;
+        uniform float uHeight;
+        uniform float randSeed;
+        
+        uniform vec2 mouseCoords;
+        uniform int state;//0 means not started yet, 1 means starting, 2 means currently running
+        
+        uniform vec3 randomColorMod;
+    
+        //Returns random nums
+        highp float rand(vec2 co)
+        {
+            highp float a = 12.9898;
+            highp float b = 78.233;
+            highp float c = 43758.5453;
+            highp float dt= dot(co.xy ,vec2(a,b));
+            highp float sn= mod(dt,3.14);
+            return fract(sin(sn) * c);
+        }
+        
+        vec4 get(vec2 mod){
+            return texture2D(tCurrentFront, vUv+mod);
+        }
+    
+        void main(){   
+            vec4 current = texture2D(tCurrentFront, vec2(vUv.x,vUv.y));
+            
+            vec4 tex = current;
+        
+            if(state > 0 && current.a == 0.){
+                float cellWidth = 1./uWidth;
+                float cellHeight = 1./uHeight; 
+            
+                vec2 scaledUV = vec2(uWidth*vUv.x,uHeight*vUv.y);
+            
+                if(state == 1){
+                    if(scaledUV.x >= mouseCoords.x && scaledUV.x < mouseCoords.x + 1. &&
+                        scaledUV.y >= mouseCoords.y && scaledUV.y < mouseCoords.y + 1.){
+
+                        tex = vec4(
+                                rand(gl_FragCoord.xy*randSeed*randomColorMod.x),//Red
+                                rand(gl_FragCoord.xy*randSeed*randomColorMod.y),//Green
+                                rand(gl_FragCoord.xy*randSeed*randomColorMod.z),//Blue
+                                1.
+                            );
+
+                    }
+                }
+                else{ 
+                    vec4 avg = 
+                        get(vec2(-cellWidth,-cellHeight))+
+                        get(vec2(-cellWidth,0.)) +
+                        get(vec2(-cellWidth,cellHeight)) +
+                        get(vec2(0.,-cellHeight)) +
+                        get(vec2(0.,cellHeight)) +
+                        get(vec2(cellWidth,-cellHeight)) +
+                        get(vec2(cellWidth,0.)) +
+                        get(vec2(cellWidth,cellHeight));
+
+                    if(avg.a < 1.){
+                        tex = vec4(0.);
+                    }
+                    else if(rand(gl_FragCoord.xy*randSeed) > .75 || avg.a > 4.){
+                        tex = vec4(
+                                clamp((avg.r/avg.a)+(rand(gl_FragCoord.xy*randSeed*randomColorMod.x)*.04)-0.02,0.,1.),
+                                clamp((avg.g/avg.a)+(rand(gl_FragCoord.xy*randSeed*randomColorMod.y)*.04)-0.02,0.,1.),
+                                clamp((avg.b/avg.a)+(rand(gl_FragCoord.xy*randSeed*randomColorMod.z)*.04)-0.02,0.,1.),
+                                1.0);
+                    }
+                    
+                    
+                }
+            }
+            
+            gl_FragColor = tex;
+        }
+    
+    </script>
+    
+    <script id="vShader-display" type="x-shader/x-vertex">       
+       varying vec2 vUv;
+       uniform sampler2D tDiffuse;
+       
+       void main(){   
+            vUv = uv;
+       
+            gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
+        }
+    </script>
+    
+    <script id="fShader-display" type="x-shader/x-fragment">
+        varying vec2 vUv;
+        uniform sampler2D tDiffuse;
+        
+        void main(){            
+            gl_FragColor = texture2D(tDiffuse,vUv);
+        }     
+    </script>
+    
+    <link rel="stylesheet" href="style/bootstrap.min.css" type="text/css">
+    <link rel="stylesheet" href="style/font-awesome.min.css" type="text/css">
+    
+    <link rel="stylesheet" href="style/style.css" type="text/css">
+    
+</head>
+
+<body>   
+   <div id="ui">
+       <button type="button" class="btn btn-primary" id="save">Save image</button>
+       <button type="button" class="btn btn-warning" id="playPause" disabled><i class="fa fa-play"></i></button>
+   </div>
+   
+   <p id="beginText">Click anywhere to begin.</p>
+   
+    <script src="scripts/loader.js"></script>
+</body>
+</html>
+<style></style>

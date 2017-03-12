@@ -1,0 +1,46 @@
+ body{
+    font-family: "Century Gothic",CenturyGothic,AppleGothic,sans-serif; 
+    margin: 0; 
+    overflow: hidden;
+}
+        
+canvas{
+    position: absolute;
+    min-width: 100%;
+    min-height: 100%;
+}
+    
+#ui{
+    position: absolute;
+    bottom: 10px;
+    left:10px;
+    z-index: 10;
+          
+    opacity: 0;
+    
+    -webkit-transition: opacity .75s ease-out;
+    transition: opacity .75s ease-out;
+}
+
+#beginText{
+    font-size: 1.5em;
+    font-weight: bold;
+    
+    position: absolute;
+    
+    left:50%;
+    top:50%;
+    
+    transform: translate(-50%,-50%);
+    
+    opacity: 1;
+    
+    -webkit-transition: opacity .75s ease-out;
+    transition: opacity .75s ease-out;
+}
+
+@media only screen and (max-device-width: 480px) {
+    #ui{
+        opacity: 1;      
+    }    
+}
